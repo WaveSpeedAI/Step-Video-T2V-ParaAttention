@@ -18,7 +18,7 @@ def parallelize_transformer(transformer: StepVideoModel, *, mesh=None):
     batch_mesh = mesh["batch"]
     seq_mesh = mesh["ring", "ulysses"]._flatten()
 
-    @functools.wraps(transformer.__class__.prepare_attention_mask)
+    @functools.wraps(transformer.__class__.prepare_attn_mask)
     def new_prepare_attn_mask(
         self, encoder_attention_mask, encoder_hidden_states, q_seqlen
     ):

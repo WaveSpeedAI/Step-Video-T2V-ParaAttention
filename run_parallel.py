@@ -126,9 +126,9 @@ if __name__ == "__main__":
     args = parse_args()
 
     output_file_name = os.environ.get("OUTPUT_FILE_NAME", "stepvideo")
-    use_quantum_attn = os.environ.get("USE_QUANTUM_ATTN", False)
-    use_fp8_attn = os.environ.get("USE_FP8_ATTN", False)
-    use_fbcache = os.environ.get("USE_FBCACHE", False)
+    use_quantum_attn = os.environ.get("USE_QUANTUM_ATTN") == "1"
+    use_fp8_attn = os.environ.get("USE_FP8_ATTN") == "1"
+    use_fbcache = os.environ.get("USE_FBCACHE") == "1"
 
     persist_attrs = {
         "model_dir": args.model_dir,
