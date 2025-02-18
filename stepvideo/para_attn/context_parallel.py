@@ -27,7 +27,7 @@ def parallelize_transformer(transformer: StepVideoModel, *, mesh=None):
 
     transformer.prepare_attn_mask = new_prepare_attn_mask.__get__(transformer)
 
-    @functools.update_wrapper(transformer.__class__.block_forward)
+    @functools.wraps(transformer.__class__.block_forward)
     def new_block_forward(
         self,
         hidden_states,
