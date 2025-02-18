@@ -50,17 +50,22 @@ class RoPE1D:
 class RoPE3D(RoPE1D):
     def __init__(self, freq=1e4, F0=1.0, scaling_factor=1.0):
         super(RoPE3D, self).__init__(freq, F0, scaling_factor)
-        self.position_cache = {}
+        # self.position_cache = {}
 
-    def get_mesh_3d(self, rope_positions, bsz):
+    def get_mesh_3d(self, rope_positions, bsz, device="cpu"):
         f, h, w = rope_positions
 
-        if f"{f}-{h}-{w}" not in self.position_cache:
-            x = torch.arange(f, device='cpu')
-            y = torch.arange(h, device='cpu')
-            z = torch.arange(w, device='cpu')
-            self.position_cache[f"{f}-{h}-{w}"] = torch.cartesian_prod(x, y, z).view(1, f*h*w, 3).expand(bsz, -1, 3)
-        return self.position_cache[f"{f}-{h}-{w}"]
+        # if f"{f}-{h}-{w}" not in self.position_cache:
+        #     x = torch.arange(f, device='cpu')
+        #     y = torch.arange(h, device='cpu')
+        #     z = torch.arange(w, device='cpu')
+        #     self.position_cache[f"{f}-{h}-{w}"] = torch.cartesian_prod(x, y, z).view(1, f*h*w, 3).expand(bsz, -1, 3)
+        # return self.position_cache[f"{f}-{h}-{w}"]
+
+        x = torch.arange(f, device=device)
+        y = torch.arange(h, device=device)
+        z = torch.arange(w, device=device)
+        return torch.cartesian_prod(x, y, z).view(1, f*h*w, 3).expand(bsz, -1, 3)
      
     def __call__(self, tokens, rope_positions, ch_split, parallel=False):
         """
@@ -72,7 +77,7 @@ class RoPE3D(RoPE1D):
         """
         assert sum(ch_split) == tokens.size(-1); 
 
-        mesh_grid = self.get_mesh_3d(rope_positions, bsz=tokens.shape[0])
+        mesh_grid = self.get_mesh_3d(rope_positions, bsz=tokens.shape[0], device=tokens.device)
         out = []
         for i, (D, x) in enumerate(zip(ch_split, torch.split(tokens, ch_split, dim=-1))):
             cos, sin = self.get_cos_sin(D, int(mesh_grid.max()) + 1, tokens.device, tokens.dtype)
@@ -81,10 +86,10 @@ class RoPE3D(RoPE1D):
                 import para_attn.primitives as DP
                 from stepvideo.para_attn import context_parallel
 
-                mesh = DP.get_assigned_chunk(mesh_grid[:, :, i], dim=1, group=context_parallel.current_seq_mesh).clone()
+                mesh = DP.get_assigned_chunk(mesh_grid[:, :, i], dim=1, group=context_parallel.current_seq_mesh)
             else:
-                mesh = mesh_grid[:, :, i].clone()
-            x = self.apply_rope1d(x, mesh.to(tokens.device), cos, sin)
+                mesh = mesh_grid[:, :, i]
+            x = self.apply_rope1d(x, mesh, cos, sin)
             out.append(x)
             
         tokens = torch.cat(out, dim=-1)
