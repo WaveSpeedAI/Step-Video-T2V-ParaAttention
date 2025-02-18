@@ -13,6 +13,8 @@ class Attention(nn.Module):
         super().__init__()
     
     def attn_processor(self, attn_type):
+        return self.torch_attn_func
+
         if attn_type == 'torch':
             return self.torch_attn_func
         elif attn_type == 'parallel':

@@ -22,46 +22,7 @@ def parallelize_transformer(transformer: StepVideoModel, *, mesh=None):
     def new_prepare_attn_mask(
         self, encoder_attention_mask, encoder_hidden_states, q_seqlen
     ):
-        batch_size = encoder_hidden_states.shape[0]
-        latent_sequence_length = q_seqlen
-        latent_attention_mask = torch.ones(
-            batch_size,
-            1,
-            latent_sequence_length,
-            device=encoder_hidden_states.device,
-            dtype=torch.bool,
-        )
-        attention_mask = torch.cat(
-            [latent_attention_mask, encoder_attention_mask.unsqueeze(1).to(torch.bool)],
-            dim=-1,
-        )
-
-        world_size = DP.get_world_size(seq_mesh)
-        hidden_states_len = q_seqlen // world_size
-        encoder_hidden_states_len = encoder_hidden_states.shape[-2] // world_size
-
-        attention_mask = DP.get_assigned_chunk(attention_mask, dim=0, group=batch_mesh)
-        attention_mask = attention_mask[..., :1, :]
-
-        new_attention_mask = []
-        for i in range(world_size):
-            new_attention_mask.append(
-                attention_mask[
-                    ..., :, i * hidden_states_len : (i + 1) * hidden_states_len
-                ]
-            )
-            new_attention_mask.append(
-                attention_mask[
-                    ...,
-                    :,
-                    world_size * hidden_states_len
-                    + i * encoder_hidden_states_len : world_size * hidden_states_len
-                    + (i + 1) * encoder_hidden_states_len,
-                ]
-            )
-        new_attention_mask = torch.cat(new_attention_mask, dim=-1)
-        attention_mask = new_attention_mask
-
+        attention_mask = encoder_attention_mask.unsqueeze(1).to(torch.bool)
         return encoder_hidden_states, attention_mask
 
     transformer.prepare_attn_mask = new_prepare_attn_mask.__get__(transformer)
