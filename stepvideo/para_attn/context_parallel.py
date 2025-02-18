@@ -10,13 +10,20 @@ from para_attn.para_attn_interface import SparseKVAttnMode, UnifiedAttnMode
 from stepvideo.modules.model import StepVideoModel
 
 
+current_seq_mesh = None
+
+
 def parallelize_transformer(transformer: StepVideoModel, *, mesh=None):
     if getattr(transformer, "_is_parallelized", False):
         return transformer
 
+    global current_seq_mesh
+
     mesh = init_context_parallel_mesh(transformer.device.type, mesh=mesh)
     batch_mesh = mesh["batch"]
     seq_mesh = mesh["ring", "ulysses"]._flatten()
+
+    current_seq_mesh = seq_mesh
 
     @functools.wraps(transformer.__class__.prepare_attn_mask)
     def new_prepare_attn_mask(

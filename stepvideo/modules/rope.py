@@ -78,7 +78,10 @@ class RoPE3D(RoPE1D):
             cos, sin = self.get_cos_sin(D, int(mesh_grid.max()) + 1, tokens.device, tokens.dtype)
             
             if parallel:
-                mesh = torch.chunk(mesh_grid[:, :, i], get_sequence_parallel_world_size(),dim=1)[get_sequence_parallel_rank()].clone()
+                import para_attn.primitives as DP
+                from stepvideo.para_attn import context_parallel
+
+                mesh = DP.get_assigned_chunk(mesh_grid[:, :, i], dim=1, group=context_parallel.current_seq_mesh).clone()
             else:
                 mesh = mesh_grid[:, :, i].clone()
             x = self.apply_rope1d(x, mesh.to(tokens.device), cos, sin)
