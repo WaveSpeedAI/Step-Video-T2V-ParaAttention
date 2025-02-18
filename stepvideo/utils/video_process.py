@@ -34,11 +34,12 @@ class VideoProcessor:
         
     
     def postprocess_video(self, video_tensor, output_file_name='', output_type="mp4", crop2standard540p=True):
-        if len(self.name_suffix) == 0:
-            video_path = os.path.join(self.save_path, f"{output_file_name}-{str(datetime.datetime.now())}.{output_type}")
-        else:
-            video_path = os.path.join(self.save_path, f"{output_file_name}-{self.name_suffix}.{output_type}")
-        
+        # if len(self.name_suffix) == 0:
+        #     video_path = os.path.join(self.save_path, f"{output_file_name}-{str(datetime.datetime.now())}.{output_type}")
+        # else:
+        #     video_path = os.path.join(self.save_path, f"{output_file_name}-{self.name_suffix}.{output_type}")
+        video_path = f"{output_file_name}.{output_type}"
+
         video_tensor = (video_tensor.cpu().clamp(-1, 1)+1)*127.5
         video_tensor = torch.cat([t for t in video_tensor], dim=-2)
         video_array = video_tensor.clamp(0, 255).to(torch.uint8).numpy().transpose(0,2,3,1)

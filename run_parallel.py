@@ -23,7 +23,6 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
 
         use_quantum_attn = self.persist_attrs.get("use_quantum_attn", False)
         use_fp8_attn = self.persist_attrs.get("use_fp8_attn", False)
-        use_fbcache = self.persist_attrs.get("use_fbcache", False)
 
         if use_quantum_attn:
             from quantum_attn.quantum_attn_interface import attn_func_with_fallback
@@ -56,11 +55,6 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
             mesh=mesh,
         )
 
-        if use_fbcache:
-            from stepvideo.para_attn.first_block_cache import apply_cache_on_pipe
-
-            apply_cache_on_pipe(self.pipeline)
-
         seed = self.persist_attrs["seed"]
         setup_seed(seed)
 
@@ -74,18 +68,21 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
         neg_magic = self.persist_attrs["neg_magic"]
 
         begin = time.time()
-        self.pipeline(
-            prompt=prompt,
-            num_frames=num_frames,
-            height=height,
-            width=width,
-            num_inference_steps=1,
-            guidance_scale=cfg_scale,
-            time_shift=time_shift,
-            pos_magic=pos_magic,
-            neg_magic=neg_magic,
-            output_type="latent",
-        )
+        with torch.nn.attention.sdpa_kernel(
+            torch.nn.attention.SDPBackend.CUDNN_ATTENTION,
+        ):
+            self.pipeline(
+                prompt=prompt,
+                num_frames=num_frames,
+                height=height,
+                width=width,
+                num_inference_steps=1,
+                guidance_scale=cfg_scale,
+                time_shift=time_shift,
+                pos_magic=pos_magic,
+                neg_magic=neg_magic,
+                output_type="latent",
+            )
         end = time.time()
         print(f"Warmup Time: {end - begin:.2f}s")
 
@@ -106,18 +103,21 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
         output_file_name = self.persist_attrs["output_file_name"]
 
         begin = time.time()
-        self.pipeline(
-            prompt=prompt,
-            num_frames=num_frames,
-            height=height,
-            width=width,
-            num_inference_steps=infer_steps,
-            guidance_scale=cfg_scale,
-            time_shift=time_shift,
-            pos_magic=pos_magic,
-            neg_magic=neg_magic,
-            output_file_name=output_file_name,
-        )
+        with torch.nn.attention.sdpa_kernel(
+            torch.nn.attention.SDPBackend.CUDNN_ATTENTION,
+        ):
+            self.pipeline(
+                prompt=prompt,
+                num_frames=num_frames,
+                height=height,
+                width=width,
+                num_inference_steps=infer_steps,
+                guidance_scale=cfg_scale,
+                time_shift=time_shift,
+                pos_magic=pos_magic,
+                neg_magic=neg_magic,
+                output_file_name=output_file_name,
+            )
         end = time.time()
         print(f"Time: {end - begin:.2f}s")
 
@@ -126,9 +126,8 @@ if __name__ == "__main__":
     args = parse_args()
 
     output_file_name = os.environ.get("OUTPUT_FILE_NAME", "stepvideo")
-    use_quantum_attn = os.environ.get("USE_QUANTUM_ATTN") == "1"
-    use_fp8_attn = os.environ.get("USE_FP8_ATTN") == "1"
-    use_fbcache = os.environ.get("USE_FBCACHE") == "1"
+    use_quantum_attn = os.environ.get("USE_QUANTUM_ATTN", False)
+    use_fp8_attn = os.environ.get("USE_FP8_ATTN", False)
 
     persist_attrs = {
         "model_dir": args.model_dir,
@@ -147,7 +146,6 @@ if __name__ == "__main__":
         "output_file_name": output_file_name,
         "use_quantum_attn": use_quantum_attn,
         "use_fp8_attn": use_fp8_attn,
-        "use_fbcache": use_fbcache,
     }
 
     with StepVideoPipelineMPDistRunner(

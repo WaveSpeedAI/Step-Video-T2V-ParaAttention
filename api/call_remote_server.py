@@ -8,7 +8,7 @@ import threading
 import argparse
 
 
-device = f'cuda:{torch.cuda.device_count()-1}'
+device = f'cuda:0'
 torch.cuda.set_device(device)
 dtype = torch.bfloat16
 
@@ -50,6 +50,7 @@ class StepVaePipeline(Resource):
                 samples = self.vae.decode(samples.to(dtype).to(device) / self.scale_factor)
                 if hasattr(samples,'sample'):
                     samples = samples.sample
+                samples = samples.detach().cpu()
                 return samples
             except:
                 torch.cuda.empty_cache()
