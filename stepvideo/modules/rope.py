@@ -10,15 +10,23 @@ class RoPE1D:
         self.cache = {}
 
     def get_cos_sin(self, D, seq_len, device, dtype):
-        if (D, seq_len, device, dtype) not in self.cache:
-            inv_freq = 1.0 / (self.base ** (torch.arange(0, D, 2).float().to(device) / D))
-            t = torch.arange(seq_len, device=device, dtype=inv_freq.dtype)
-            freqs = torch.einsum("i,j->ij", t, inv_freq).to(dtype)
-            freqs = torch.cat((freqs, freqs), dim=-1)
-            cos = freqs.cos()  # (Seq, Dim)
-            sin = freqs.sin()
-            self.cache[D, seq_len, device, dtype] = (cos, sin)
-        return self.cache[D, seq_len, device, dtype]
+        # if (D, seq_len, device, dtype) not in self.cache:
+        #     inv_freq = 1.0 / (self.base ** (torch.arange(0, D, 2).float().to(device) / D))
+        #     t = torch.arange(seq_len, device=device, dtype=inv_freq.dtype)
+        #     freqs = torch.einsum("i,j->ij", t, inv_freq).to(dtype)
+        #     freqs = torch.cat((freqs, freqs), dim=-1)
+        #     cos = freqs.cos()  # (Seq, Dim)
+        #     sin = freqs.sin()
+        #     self.cache[D, seq_len, device, dtype] = (cos, sin)
+        # return self.cache[D, seq_len, device, dtype]
+
+        inv_freq = 1.0 / (self.base ** (torch.arange(0, D, 2, device=device, dtype=torch.float32) / D))
+        t = torch.arange(seq_len, device=device, dtype=inv_freq.dtype)
+        freqs = torch.einsum("i,j->ij", t, inv_freq).to(dtype)
+        freqs = torch.cat((freqs, freqs), dim=-1)
+        cos = freqs.cos()  # (Seq, Dim)
+        sin = freqs.sin()
+        return (cos, sin)
 
     @staticmethod
     def rotate_half(x):
