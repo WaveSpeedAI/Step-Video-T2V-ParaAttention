@@ -25,8 +25,8 @@ if __name__ == "__main__":
         author="Step-Video Team",
         packages=find_packages(),
         install_requires=[
-            "torchvision==0.18",
-            "torch==2.3",
+            "torchvision",
+            "torch",
             "accelerate>=1.0.0",
             "transformers>=4.39.1",
             "diffusers>=0.31.0",
@@ -41,7 +41,6 @@ if __name__ == "__main__":
             "flask_restful",
             "ffmpeg-python",
             "requests",
-            "xfuser",
         ],
         url="",
         description="A 30B DiT based text to video and image generation model",
