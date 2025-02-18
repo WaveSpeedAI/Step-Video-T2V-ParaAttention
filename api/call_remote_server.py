@@ -53,8 +53,8 @@ class StepVaePipeline(Resource):
                         samples = samples.sample
                     samples = samples.detach().cpu()
                     return samples
-                except:
-                    torch.cuda.empty_cache()
+                except Exception as err:
+                    print(f"{err}")
                     return None
         finally:
             torch.cuda.empty_cache()
