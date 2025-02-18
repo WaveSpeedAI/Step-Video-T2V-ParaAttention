@@ -32,6 +32,7 @@ if __name__ == "__main__":
             "diffusers>=0.31.0",
             "sentencepiece>=0.1.99",
             "imageio>=2.37.0",
+            "imageio-ffmpeg",
             "optimus==2.1",
             "numpy",
             "einops",

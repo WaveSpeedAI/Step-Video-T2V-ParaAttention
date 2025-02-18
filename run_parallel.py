@@ -23,6 +23,7 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
 
         use_quantum_attn = self.persist_attrs.get("use_quantum_attn", False)
         use_fp8_attn = self.persist_attrs.get("use_fp8_attn", False)
+        use_fbcache = self.persist_attrs.get("use_fbcache", False)
 
         if use_quantum_attn:
             from quantum_attn.quantum_attn_interface import attn_func_with_fallback
@@ -54,6 +55,11 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
             self.pipeline,
             mesh=mesh,
         )
+
+        if use_fbcache:
+            from stepvideo.para_attn.first_block_cache import apply_cache_on_pipe
+
+            apply_cache_on_pipe(self.pipeline)
 
         seed = self.persist_attrs["seed"]
         setup_seed(seed)
@@ -122,6 +128,7 @@ if __name__ == "__main__":
     output_file_name = os.environ.get("OUTPUT_FILE_NAME", "stepvideo")
     use_quantum_attn = os.environ.get("USE_QUANTUM_ATTN", False)
     use_fp8_attn = os.environ.get("USE_FP8_ATTN", False)
+    use_fbcache = os.environ.get("USE_FBCACHE", False)
 
     persist_attrs = {
         "model_dir": args.model_dir,
@@ -140,6 +147,7 @@ if __name__ == "__main__":
         "output_file_name": output_file_name,
         "use_quantum_attn": use_quantum_attn,
         "use_fp8_attn": use_fp8_attn,
+        "use_fbcache": use_fbcache,
     }
 
     with StepVideoPipelineMPDistRunner(

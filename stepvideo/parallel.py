@@ -44,3 +44,4 @@ def parallel_forward(fn_):
         return output
      
     return wrapTheFunction
+
