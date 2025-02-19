@@ -165,6 +165,7 @@ if __name__ == "__main__":
         "use_quantum_attn": use_quantum_attn,
         "use_fp8_attn": use_fp8_attn,
         "use_fbcache": use_fbcache,
+        "use_extra_gpu": use_extra_gpu,
     }
 
     with StepVideoPipelineMPDistRunner(
