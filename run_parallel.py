@@ -78,24 +78,24 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
         neg_magic = self.persist_attrs["neg_magic"]
 
         begin = time.time()
-        with torch.nn.attention.sdpa_kernel(
-            torch.nn.attention.SDPBackend.CUDNN_ATTENTION,
-        ):
-            try:
-                self.pipeline(
-                    prompt=prompt,
-                    num_frames=num_frames,
-                    height=height,
-                    width=width,
-                    num_inference_steps=1,
-                    guidance_scale=cfg_scale,
-                    time_shift=time_shift,
-                    pos_magic=pos_magic,
-                    neg_magic=neg_magic,
-                    output_type="latent",
-                )
-            finally:
-                torch.cuda.empty_cache()
+        # with torch.nn.attention.sdpa_kernel(
+        #     torch.nn.attention.SDPBackend.CUDNN_ATTENTION,
+        # ):
+        try:
+            self.pipeline(
+                prompt=prompt,
+                num_frames=num_frames,
+                height=height,
+                width=width,
+                num_inference_steps=1,
+                guidance_scale=cfg_scale,
+                time_shift=time_shift,
+                pos_magic=pos_magic,
+                neg_magic=neg_magic,
+                output_type="latent",
+            )
+        finally:
+            torch.cuda.empty_cache()
         end = time.time()
         print(f"Warmup Time: {end - begin:.2f}s")
 
@@ -116,24 +116,24 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
         output_file_name = self.persist_attrs["output_file_name"]
 
         begin = time.time()
-        with torch.nn.attention.sdpa_kernel(
-            torch.nn.attention.SDPBackend.CUDNN_ATTENTION,
-        ):
-            try:
-                self.pipeline(
-                    prompt=prompt,
-                    num_frames=num_frames,
-                    height=height,
-                    width=width,
-                    num_inference_steps=infer_steps,
-                    guidance_scale=cfg_scale,
-                    time_shift=time_shift,
-                    pos_magic=pos_magic,
-                    neg_magic=neg_magic,
-                    output_file_name=output_file_name,
-                )
-            finally:
-                torch.cuda.empty_cache()
+        # with torch.nn.attention.sdpa_kernel(
+        #     torch.nn.attention.SDPBackend.CUDNN_ATTENTION,
+        # ):
+        try:
+            self.pipeline(
+                prompt=prompt,
+                num_frames=num_frames,
+                height=height,
+                width=width,
+                num_inference_steps=infer_steps,
+                guidance_scale=cfg_scale,
+                time_shift=time_shift,
+                pos_magic=pos_magic,
+                neg_magic=neg_magic,
+                output_file_name=output_file_name,
+            )
+        finally:
+            torch.cuda.empty_cache()
         end = time.time()
         print(f"Time: {end - begin:.2f}s")
 

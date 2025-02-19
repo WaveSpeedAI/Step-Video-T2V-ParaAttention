@@ -132,22 +132,23 @@ class StepVideoPipeline(DiffusionPipeline):
         if torch.distributed.is_initialized():
             import torch.distributed as dist
             if int(torch.distributed.get_rank())==0:
-                data = self.caption(prompts)
-                prompt_embeds, prompt_attention_mask, clip_embedding = data['y'].to(device), data['y_mask'].to(device), data['clip_embedding'].to(device)
+                data = self.caption.embedding(prompts)
+                prompt_embeds, prompt_attention_mask, clip_embedding = data['y'].cpu(), data['y_mask'].cpu(), data['clip_embedding'].cpu()
                 obj_list = [prompt_embeds, prompt_attention_mask, clip_embedding]
             else:
                 obj_list = [None, None, None]
             dist.broadcast_object_list(obj_list, 0)
             prompt_embeds, prompt_attention_mask, clip_embedding = obj_list
+            prompt_embeds, prompt_attention_mask, clip_embedding = prompt_embeds.to(device), prompt_attention_mask.to(device), clip_embedding.to(device)
         else:
-            data = self.caption(prompts)
+            data = self.caption.embedding(prompts)
             prompt_embeds, prompt_attention_mask, clip_embedding = data['y'].to(device), data['y_mask'].to(device), data['clip_embedding'].to(device)
 
         return prompt_embeds, clip_embedding, prompt_attention_mask
 
     def decode_vae(self, samples):
         # samples = asyncio.run(self.vae(samples.cpu()))
-        samples = self.vae(samples)
+        samples = self.vae.decode(samples)
         return samples
 
     def check_inputs(self, num_frames, width, height):

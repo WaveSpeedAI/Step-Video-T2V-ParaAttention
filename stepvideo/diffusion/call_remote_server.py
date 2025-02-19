@@ -9,7 +9,7 @@ import argparse
 
 
 device = f'cuda:{torch.cuda.device_count()-1}'
-torch.cuda.set_device(device)
+# torch.cuda.set_device(device)
 dtype = torch.bfloat16
 
 def parsed_args():
