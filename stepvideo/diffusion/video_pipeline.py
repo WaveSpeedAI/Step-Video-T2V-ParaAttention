@@ -334,6 +334,7 @@ class StepVideoPipeline(DiffusionPipeline):
                 
                 progress_bar.update()
 
+        torch.cuda.empty_cache()
         if not torch.distributed.is_initialized() or int(torch.distributed.get_rank())==0:
             if not output_type == "latent":
                 video = self.decode_vae(latents)

@@ -8,7 +8,7 @@ import threading
 import argparse
 
 
-device = f'cuda:{torch.cuda.device_count()-1}'
+device = f'cuda:0'
 torch.cuda.set_device(device)
 dtype = torch.bfloat16
 
@@ -43,17 +43,21 @@ class StepVaePipeline(Resource):
         return model
  
     def decode(self, samples, *args, **kwargs):
-        with torch.no_grad():
-            try:
-                dtype = next(self.vae.parameters()).dtype
-                device = next(self.vae.parameters()).device
-                samples = self.vae.decode(samples.to(dtype).to(device) / self.scale_factor)
-                if hasattr(samples,'sample'):
-                    samples = samples.sample
-                return samples
-            except:
-                torch.cuda.empty_cache()
-                return None
+        try:
+            with torch.no_grad():
+                try:
+                    dtype = next(self.vae.parameters()).dtype
+                    device = next(self.vae.parameters()).device
+                    samples = self.vae.decode(samples.to(dtype).to(device) / self.scale_factor)
+                    if hasattr(samples,'sample'):
+                        samples = samples.sample
+                    samples = samples.detach().cpu()
+                    return samples
+                except Exception as err:
+                    print(f"{err}")
+                    return None
+        finally:
+            torch.cuda.empty_cache()
 
 lock = threading.Lock()
 class VAEapi(Resource):
@@ -96,25 +100,28 @@ class CaptionPipeline(Resource):
         return clip
  
     def embedding(self, prompts, *args, **kwargs):
-        with torch.no_grad():
-            try:
-                y, y_mask = self.text_encoder(prompts)
+        try:
+            with torch.no_grad():
+                try:
+                    y, y_mask = self.text_encoder(prompts)
+                        
+                    clip_embedding, _ = self.clip(prompts)
                     
-                clip_embedding, _ = self.clip(prompts)
-                
-                len_clip = clip_embedding.shape[1]
-                y_mask = torch.nn.functional.pad(y_mask, (len_clip, 0), value=1)   ## pad attention_mask with clip's length 
+                    len_clip = clip_embedding.shape[1]
+                    y_mask = torch.nn.functional.pad(y_mask, (len_clip, 0), value=1)   ## pad attention_mask with clip's length 
 
-                data = {
-                    'y': y.detach().cpu(),
-                    'y_mask': y_mask.detach().cpu(),
-                    'clip_embedding': clip_embedding.to(torch.bfloat16).detach().cpu()
-                }
+                    data = {
+                        'y': y.detach().cpu(),
+                        'y_mask': y_mask.detach().cpu(),
+                        'clip_embedding': clip_embedding.to(torch.bfloat16).detach().cpu()
+                    }
 
-                return data
-            except Exception as err:
-                print(f"{err}")
-                return None
+                    return data
+                except Exception as err:
+                    print(f"{err}")
+                    return None
+        finally:
+            torch.cuda.empty_cache()
 
 
 

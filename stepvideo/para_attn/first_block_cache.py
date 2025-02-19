@@ -11,7 +11,7 @@ from stepvideo.modules.model import StepVideoModel
 def apply_cache_on_transformer(
     transformer: StepVideoModel,
     *,
-    residual_diff_threshold=0.06,
+    residual_diff_threshold=0.03,
 ):
     if getattr(transformer, "_is_cached", False):
         return transformer
@@ -19,7 +19,8 @@ def apply_cache_on_transformer(
     cached_transformer_blocks = torch.nn.ModuleList(
         [
             utils.CachedTransformerBlocks(
-                single_transformer_blocks=transformer.transformer_blocks,
+                transformer.transformer_blocks,
+                transformer=transformer,
                 residual_diff_threshold=residual_diff_threshold,
                 return_hidden_states_only=True,
             )

@@ -50,6 +50,20 @@ def parallelize_transformer(transformer: StepVideoModel, *, mesh=None):
         encoder_hidden_states = DP.get_assigned_chunk(
             encoder_hidden_states, dim=0, group=batch_mesh
         )
+
+        if attn_mask is not None:
+            attn_mask = DP.get_assigned_chunk(attn_mask, dim=0, group=batch_mesh)
+
+        encoder_hidden_states_len = encoder_hidden_states.size(-2)
+        if encoder_hidden_states_len % 8 != 0:
+            encoder_hidden_states = torch.nn.functional.pad(
+                encoder_hidden_states, (0, 0, 0, 8 - encoder_hidden_states_len % 8)
+            )
+            if attn_mask is not None:
+                attn_mask = torch.nn.functional.pad(
+                    attn_mask, (0, 8 - encoder_hidden_states_len % 8)
+                )
+
         encoder_hidden_states = DP.get_assigned_chunk(
             encoder_hidden_states, dim=-2, group=seq_mesh
         )

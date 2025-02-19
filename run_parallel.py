@@ -38,15 +38,17 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
             F.scaled_dot_product_attention = fp8_attn_func_with_fallback
 
         model_dir = self.persist_attrs["model_dir"]
-        vae_url = self.persist_attrs["vae_url"]
-        caption_url = self.persist_attrs["caption_url"]
+        # vae_url = self.persist_attrs["vae_url"]
+        # caption_url = self.persist_attrs["caption_url"]
+        use_extra_gpu = self.persist_attrs["use_extra_gpu"]
 
         self.pipeline = StepVideoPipeline.from_pretrained(model_dir).to(
             dtype=torch.bfloat16).to(device="cuda")
-        self.pipeline.setup_api(
-            vae_url=vae_url,
-            caption_url=caption_url,
-        )
+        # self.pipeline.setup_api(
+        #     vae_url=vae_url,
+        #     caption_url=caption_url,
+        # )
+        self.pipeline.init_api_models(model_dir, use_extra_gpu=use_extra_gpu)
 
         from para_attn.context_parallel import init_context_parallel_mesh
         from stepvideo.para_attn.context_parallel import parallelize_pipe
@@ -76,18 +78,24 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
         neg_magic = self.persist_attrs["neg_magic"]
 
         begin = time.time()
-        self.pipeline(
-            prompt=prompt,
-            num_frames=num_frames,
-            height=height,
-            width=width,
-            num_inference_steps=1,
-            guidance_scale=cfg_scale,
-            time_shift=time_shift,
-            pos_magic=pos_magic,
-            neg_magic=neg_magic,
-            output_type="latent",
-        )
+        with torch.nn.attention.sdpa_kernel(
+            torch.nn.attention.SDPBackend.CUDNN_ATTENTION,
+        ):
+            try:
+                self.pipeline(
+                    prompt=prompt,
+                    num_frames=num_frames,
+                    height=height,
+                    width=width,
+                    num_inference_steps=1,
+                    guidance_scale=cfg_scale,
+                    time_shift=time_shift,
+                    pos_magic=pos_magic,
+                    neg_magic=neg_magic,
+                    output_type="latent",
+                )
+            finally:
+                torch.cuda.empty_cache()
         end = time.time()
         print(f"Warmup Time: {end - begin:.2f}s")
 
@@ -108,18 +116,24 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
         output_file_name = self.persist_attrs["output_file_name"]
 
         begin = time.time()
-        self.pipeline(
-            prompt=prompt,
-            num_frames=num_frames,
-            height=height,
-            width=width,
-            num_inference_steps=infer_steps,
-            guidance_scale=cfg_scale,
-            time_shift=time_shift,
-            pos_magic=pos_magic,
-            neg_magic=neg_magic,
-            output_file_name=output_file_name,
-        )
+        with torch.nn.attention.sdpa_kernel(
+            torch.nn.attention.SDPBackend.CUDNN_ATTENTION,
+        ):
+            try:
+                self.pipeline(
+                    prompt=prompt,
+                    num_frames=num_frames,
+                    height=height,
+                    width=width,
+                    num_inference_steps=infer_steps,
+                    guidance_scale=cfg_scale,
+                    time_shift=time_shift,
+                    pos_magic=pos_magic,
+                    neg_magic=neg_magic,
+                    output_file_name=output_file_name,
+                )
+            finally:
+                torch.cuda.empty_cache()
         end = time.time()
         print(f"Time: {end - begin:.2f}s")
 
@@ -135,8 +149,8 @@ if __name__ == "__main__":
 
     persist_attrs = {
         "model_dir": args.model_dir,
-        "vae_url": args.vae_url,
-        "caption_url": args.caption_url,
+        # "vae_url": args.vae_url,
+        # "caption_url": args.caption_url,
         "prompt": args.prompt,
         "num_frames": args.num_frames,
         "height": args.height,
