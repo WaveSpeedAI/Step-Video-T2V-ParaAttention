@@ -42,7 +42,7 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
         caption_url = self.persist_attrs["caption_url"]
 
         self.pipeline = StepVideoPipeline.from_pretrained(model_dir).to(
-            dtype=torch.bfloat16, device="cuda")
+            dtype=torch.bfloat16).to("cuda")
         self.pipeline.setup_api(
             vae_url=vae_url,
             caption_url=caption_url,
