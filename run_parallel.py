@@ -16,7 +16,9 @@ class StepVideoPipelineMPDistRunner(MPDistRunner):
 
     @property
     def world_size(self):
-        return torch.cuda.device_count()
+        use_extra_gpu = self.persist_attrs.get("use_extra_gpu", False)
+
+        return torch.cuda.device_count() - (1 if use_extra_gpu else 0)
 
     def init_processor(self):
         torch.cuda.set_device(dist.get_rank())
@@ -129,6 +131,7 @@ if __name__ == "__main__":
     use_quantum_attn = os.environ.get("USE_QUANTUM_ATTN") == "1"
     use_fp8_attn = os.environ.get("USE_FP8_ATTN") == "1"
     use_fbcache = os.environ.get("USE_FBCACHE") == "1"
+    use_extra_gpu = os.environ.get("USE_EXTRA_GPU") == "1"
 
     persist_attrs = {
         "model_dir": args.model_dir,

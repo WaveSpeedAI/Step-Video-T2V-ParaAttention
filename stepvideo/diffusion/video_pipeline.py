@@ -2,6 +2,7 @@
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
+import os
 
 import numpy as np
 import pickle
@@ -98,6 +99,23 @@ class StepVideoPipeline(DiffusionPipeline):
         self.caption = call_api_gen(caption_url, 'caption')
         self.vae = call_api_gen(vae_url, 'vae')
         return self
+
+    def init_api_models(self, model_dir, use_extra_gpu=False):
+        if not torch.distributed.is_initialized() or int(torch.distributed.get_rank())==0:
+            from . import call_remote_server
+            if use_extra_gpu:
+                call_remote_server.device = f"cuda:{torch.cuda.device_count()-1}"
+            else:
+                call_remote_server.device = "cuda:0"
+
+            self.caption = call_remote_server.CaptionPipeline(
+                llm_dir=os.path.join(model_dir, "step_llm"),
+                clip_dir=os.path.join(model_dir, "hunyuan_clip"),
+            )
+            self.vae = call_remote_server.StepVaePipeline(
+                vae_dir=os.path.join(model_dir, "vae"),
+            )
+
     
     def encode_prompt(
         self,
@@ -110,13 +128,26 @@ class StepVideoPipeline(DiffusionPipeline):
         bs = len(prompts)
         prompts += [neg_magic]*bs
         
-        data = asyncio.run(self.caption(prompts))
-        prompt_embeds, prompt_attention_mask, clip_embedding = data['y'].to(device), data['y_mask'].to(device), data['clip_embedding'].to(device)
+        # data = asyncio.run(self.caption(prompts))
+        if torch.distributed.is_initialized():
+            import torch.distributed as dist
+            if int(torch.distributed.get_rank())==0:
+                data = self.caption(prompts)
+                prompt_embeds, prompt_attention_mask, clip_embedding = data['y'].to(device), data['y_mask'].to(device), data['clip_embedding'].to(device)
+                obj_list = [prompt_embeds, prompt_attention_mask, clip_embedding]
+            else:
+                obj_list = [None, None, None]
+            dist.broadcast_object_list(obj_list, 0)
+            prompt_embeds, prompt_attention_mask, clip_embedding = obj_list
+        else:
+            data = self.caption(prompts)
+            prompt_embeds, prompt_attention_mask, clip_embedding = data['y'].to(device), data['y_mask'].to(device), data['clip_embedding'].to(device)
 
         return prompt_embeds, clip_embedding, prompt_attention_mask
 
     def decode_vae(self, samples):
-        samples = asyncio.run(self.vae(samples.cpu()))
+        # samples = asyncio.run(self.vae(samples.cpu()))
+        samples = self.vae(samples)
         return samples
 
     def check_inputs(self, num_frames, width, height):
