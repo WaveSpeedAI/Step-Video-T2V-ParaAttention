@@ -8,8 +8,8 @@ import threading
 import argparse
 
 
-device = f'cuda:0'
-torch.cuda.set_device(device)
+device = f'cuda:{torch.cuda.device_count()-1}'
+# torch.cuda.set_device(device)
 dtype = torch.bfloat16
 
 def parsed_args():
@@ -43,21 +43,17 @@ class StepVaePipeline(Resource):
         return model
  
     def decode(self, samples, *args, **kwargs):
-        try:
-            with torch.no_grad():
-                try:
-                    dtype = next(self.vae.parameters()).dtype
-                    device = next(self.vae.parameters()).device
-                    samples = self.vae.decode(samples.to(dtype).to(device) / self.scale_factor)
-                    if hasattr(samples,'sample'):
-                        samples = samples.sample
-                    samples = samples.detach().cpu()
-                    return samples
-                except Exception as err:
-                    print(f"{err}")
-                    return None
-        finally:
-            torch.cuda.empty_cache()
+        with torch.no_grad():
+            try:
+                dtype = next(self.vae.parameters()).dtype
+                device = next(self.vae.parameters()).device
+                samples = self.vae.decode(samples.to(dtype).to(device) / self.scale_factor)
+                if hasattr(samples,'sample'):
+                    samples = samples.sample
+                return samples
+            except:
+                torch.cuda.empty_cache()
+                return None
 
 lock = threading.Lock()
 class VAEapi(Resource):
@@ -72,6 +68,7 @@ class VAEapi(Resource):
             
                 feature = {k:v for k, v in feature.items() if v is not None}
                 video_latents = self.vae_pipeline.decode(**feature)
+                video_latents = video_latents.detach().cpu()
                 response = pickle.dumps(video_latents)
 
             except Exception as e:
@@ -100,28 +97,25 @@ class CaptionPipeline(Resource):
         return clip
  
     def embedding(self, prompts, *args, **kwargs):
-        try:
-            with torch.no_grad():
-                try:
-                    y, y_mask = self.text_encoder(prompts)
-                        
-                    clip_embedding, _ = self.clip(prompts)
+        with torch.no_grad():
+            try:
+                y, y_mask = self.text_encoder(prompts)
                     
-                    len_clip = clip_embedding.shape[1]
-                    y_mask = torch.nn.functional.pad(y_mask, (len_clip, 0), value=1)   ## pad attention_mask with clip's length 
+                clip_embedding, _ = self.clip(prompts)
+                
+                len_clip = clip_embedding.shape[1]
+                y_mask = torch.nn.functional.pad(y_mask, (len_clip, 0), value=1)   ## pad attention_mask with clip's length 
 
-                    data = {
-                        'y': y.detach().cpu(),
-                        'y_mask': y_mask.detach().cpu(),
-                        'clip_embedding': clip_embedding.to(torch.bfloat16).detach().cpu()
-                    }
+                data = {
+                    'y': y,
+                    'y_mask': y_mask,
+                    'clip_embedding': clip_embedding.to(torch.bfloat16),
+                }
 
-                    return data
-                except Exception as err:
-                    print(f"{err}")
-                    return None
-        finally:
-            torch.cuda.empty_cache()
+                return data
+            except Exception as err:
+                print(f"{err}")
+                return None
 
 
 
@@ -136,7 +130,7 @@ class Captionapi(Resource):
                 feature = pickle.loads(request.get_data())
                 feature['api'] = 'caption'
             
-                feature = {k:v for k, v in feature.items() if v is not None}
+                feature = {k:v.detach().cpu() for k, v in feature.items() if v is not None}
                 embeddings = self.caption_pipeline.embedding(**feature)
                 response = pickle.dumps(embeddings)
 

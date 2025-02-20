@@ -10,12 +10,18 @@
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
 # ==============================================================================
+import warnings
 import torch
 
 def flash_attn_func(q, k, v, dropout_p=0.0, softmax_scale=None, causal=True,
                     return_attn_probs=False, tp_group_rank=0, tp_group_size=1):
     softmax_scale = q.size(-1) ** (-0.5) if softmax_scale is None else softmax_scale
-    return torch.ops.Optimus.fwd(q, k, v, None, dropout_p, softmax_scale, causal, return_attn_probs, None, tp_group_rank, tp_group_size)[0]
+    if hasattr(torch.ops.Optimus, "fwd"):
+        results = torch.ops.Optimus.fwd(q, k, v, None, dropout_p, softmax_scale, causal, return_attn_probs, None, tp_group_rank, tp_group_size)[0]
+    else:
+        warnings.warn("Cannot load `torch.ops.Optimus.fwd`. Using `torch.nn.functional.scaled_dot_product_attention` instead.")
+        results = torch.nn.functional.scaled_dot_product_attention(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), is_causal=True, scale=softmax_scale).transpose(1, 2)
+    return results
 
 
 class FlashSelfAttention(torch.nn.Module):

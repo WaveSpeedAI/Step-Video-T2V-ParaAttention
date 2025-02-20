@@ -117,19 +117,21 @@ conda activate stepvideo
 
 cd Step-Video-T2V
 pip install -e .
-pip install flash-attn --no-build-isolation  ## flash-attn is optional
 ```
 
 ###  🚀 4.3 Inference Scripts
 - We employed a decoupling strategy for the text encoder, VAE decoding, and DiT to optimize GPU resource utilization by DiT. As a result, a dedicated GPU is needed to handle the API services for the text encoder's embeddings and VAE decoding.
 ```bash
-python api/call_remote_server.py --model_dir where_you_download_dir &  ## We assume you have more than 4 GPUs available. This command will return the URL for both the caption API and the VAE API. Please use the returned URL in the following command.
+python api/call_remote_server.py --model_dir model_dir &  ## We assume you have more than 4 GPUs available. This command will return the URL for both the caption API and the VAE API. Please use the returned URL in the following command.
 
-parallel=4  # or parallel=8
 url='127.0.0.1'
-model_dir=where_you_download_dir
+model_dir=model_dir
 
-torchrun --nproc_per_node $parallel run_parallel.py --model_dir $model_dir --vae_url $url --caption_url $url  --ulysses_degree $parallel --prompt "一名宇航员在月球上发现一块石碑，上面印有“stepfun”字样，闪闪发光" --infer_steps 50  --cfg_scale 9.0 --time_shift 13.0
+# OUTPUT_FILE_NAME=stepvideo
+# USE_QUANTUM_ATTN=1
+# USE_FP8_ATTN=1
+# USE_FBCACHE=1
+python3 run_parallel.py --model_dir $model_dir --vae_url $url --caption_url $url --prompt "一名宇航员在月球上发现一块石碑，上面印有“stepfun”字样，闪闪发光" --infer_steps 50  --cfg_scale 9.0 --time_shift 13.0
 ```
 
 ###  🚀 4.4 Best-of-Practice Inference settings
@@ -161,6 +163,5 @@ The online version of Step-Video-T2V is available on [跃问视频](https://yuew
 ```
 
 ## 8. Acknowledgement
-- We would like to express our sincere thanks to the [xDiT](https://github.com/xdit-project/xDiT) team for their invaluable support and parallelization strategy. 
 - Our code will be integrated into the official repository of [Huggingface/Diffusers](https://github.com/huggingface/diffusers).
 - We thank the [FastVideo](https://github.com/hao-ai-lab/FastVideo) team for their continued collaboration and look forward to launching inference acceleration solutions together in the near future.
