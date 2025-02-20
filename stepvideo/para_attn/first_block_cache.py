@@ -11,7 +11,7 @@ from stepvideo.modules.model import StepVideoModel
 def apply_cache_on_transformer(
     transformer: StepVideoModel,
     *,
-    residual_diff_threshold=0.03,
+    residual_diff_threshold=0.02,
 ):
     if getattr(transformer, "_is_cached", False):
         return transformer
