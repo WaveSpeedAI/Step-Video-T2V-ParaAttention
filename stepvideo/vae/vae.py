@@ -26,7 +26,7 @@ def base_group_norm(x, norm_layer, act_silu=False, channel_last=False):
             # Permute to NCHW format
             x = x.permute(0, 3, 1, 2)
 
-        out = F.group_norm(x.contiguous(), norm_layer.num_groups, norm_layer.weight, norm_layer.bias, norm_layer.eps)
+        out = F.group_norm(x, norm_layer.num_groups, norm_layer.weight, norm_layer.bias, norm_layer.eps)
         if act_silu:
             out = F.silu(out)
         
@@ -34,12 +34,12 @@ def base_group_norm(x, norm_layer, act_silu=False, channel_last=False):
             # Permute back to NHWC format
             out = out.permute(0, 2, 3, 1)
 
-        out = out.view(x_shape)
+        out = out.reshape(x_shape)
     else:
         if channel_last:
             # Permute to NCHW format
             x = x.permute(0, 3, 1, 2)
-        out = F.group_norm(x.contiguous(), norm_layer.num_groups, norm_layer.weight, norm_layer.bias, norm_layer.eps)
+        out = F.group_norm(x, norm_layer.num_groups, norm_layer.weight, norm_layer.bias, norm_layer.eps)
         if act_silu:
             out = F.silu(out)
         if channel_last:
@@ -171,12 +171,12 @@ class Upsample2D(nn.Module):
 
         if output_size is None:
             x = F.interpolate(
-                x.permute(0,3,1,2).to(memory_format=torch.channels_last),
-                scale_factor=2.0, mode='nearest').permute(0,2,3,1).contiguous()
+                x.permute(0,3,1,2),
+                scale_factor=2.0, mode='nearest').permute(0,2,3,1)
         else:
             x = F.interpolate(
-                x.permute(0,3,1,2).to(memory_format=torch.channels_last),
-                size=output_size, mode='nearest').permute(0,2,3,1).contiguous()
+                x.permute(0,3,1,2),
+                size=output_size, mode='nearest').permute(0,2,3,1)
 
         # x = self.conv(x)
         x = base_conv2d(x, self.conv, channel_last=True)
@@ -263,9 +263,9 @@ class ChannelDuplicatingPixelUnshuffleUpSampleLayer3D(nn.Module):
 
     def forward(self, x: torch.Tensor, is_init=True) -> torch.Tensor:
         x = x.repeat_interleave(self.repeats, dim=1)
-        x = x.view(x.size(0), self.out_channels, self.factor, self.factor, self.factor, x.size(2), x.size(3), x.size(4))
-        x = x.permute(0, 1, 5, 2, 6, 3, 7, 4).contiguous()
-        x = x.view(x.size(0), self.out_channels, x.size(2)*self.factor, x.size(4)*self.factor, x.size(6)*self.factor)
+        x = x.reshape(x.size(0), self.out_channels, self.factor, self.factor, self.factor, x.size(2), x.size(3), x.size(4))
+        x = x.permute(0, 1, 5, 2, 6, 3, 7, 4)
+        x = x.reshape(x.size(0), self.out_channels, x.size(2)*self.factor, x.size(4)*self.factor, x.size(6)*self.factor)
         x = x[:, :, self.factor - 1:, :, :]
         return x
 
@@ -299,9 +299,9 @@ class ConvPixelShuffleUpSampleLayer3D(nn.Module):
         new_height = height * factor
         new_width = width * factor
 
-        x = x.view(batch_size, new_channels, factor, factor, factor, depth, height, width)
-        x = x.permute(0, 1, 5, 2, 6, 3, 7, 4).contiguous()
-        x = x.view(batch_size, new_channels, new_depth, new_height, new_width)
+        x = x.reshape(batch_size, new_channels, factor, factor, factor, depth, height, width)
+        x = x.permute(0, 1, 5, 2, 6, 3, 7, 4)
+        x = x.reshape(batch_size, new_channels, new_depth, new_height, new_width)
         x = x[:, :, factor - 1:, :, :]
         return x
 
@@ -333,9 +333,9 @@ class ConvPixelUnshuffleDownSampleLayer3D(nn.Module):
         pad = (0, 0, 0, 0, factor-1, 0)  # (left, right, top, bottom, front, back)
         x = F.pad(x, pad)
         B, C, D, H, W = x.shape
-        x = x.view(B, C, D // factor, factor, H // factor, factor, W // factor, factor)
-        x = x.permute(0, 1, 3, 5, 7, 2, 4, 6).contiguous()
-        x = x.view(B, C * factor**3, D // factor, H // factor, W // factor)
+        x = x.reshape(B, C, D // factor, factor, H // factor, factor, W // factor, factor)
+        x = x.permute(0, 1, 3, 5, 7, 2, 4, 6)
+        x = x.reshape(B, C * factor**3, D // factor, H // factor, W // factor)
         return x
 
 class PixelUnshuffleChannelAveragingDownSampleLayer3D(nn.Module):
@@ -356,10 +356,10 @@ class PixelUnshuffleChannelAveragingDownSampleLayer3D(nn.Module):
         pad = (0, 0, 0, 0, self.factor-1, 0)  # (left, right, top, bottom, front, back)
         x = F.pad(x, pad)
         B, C, D, H, W = x.shape
-        x = x.view(B, C, D // self.factor, self.factor, H // self.factor, self.factor, W // self.factor, self.factor)
-        x = x.permute(0, 1, 3, 5, 7, 2, 4, 6).contiguous()
-        x = x.view(B, C * self.factor**3, D // self.factor, H // self.factor, W // self.factor)
-        x = x.view(B, self.out_channels, self.group_size, D // self.factor, H // self.factor, W // self.factor)
+        x = x.reshape(B, C, D // self.factor, self.factor, H // self.factor, self.factor, W // self.factor, self.factor)
+        x = x.permute(0, 1, 3, 5, 7, 2, 4, 6)
+        x = x.reshape(B, C * self.factor**3, D // self.factor, H // self.factor, W // self.factor)
+        x = x.reshape(B, self.out_channels, self.group_size, D // self.factor, H // self.factor, W // self.factor)
         x = x.mean(dim=2)
         return x
 
@@ -380,10 +380,10 @@ class PixelUnshuffleChannelAveragingDownSampleLayer3D(nn.Module):
         pad = (0, 0, 0, 0, self.factor-1, 0)  # (left, right, top, bottom, front, back)
         x = F.pad(x, pad)
         B, C, D, H, W = x.shape
-        x = x.view(B, C, D // self.factor, self.factor, H // self.factor, self.factor, W // self.factor, self.factor)
-        x = x.permute(0, 1, 3, 5, 7, 2, 4, 6).contiguous()
-        x = x.view(B, C * self.factor**3, D // self.factor, H // self.factor, W // self.factor)
-        x = x.view(B, self.out_channels, self.group_size, D // self.factor, H // self.factor, W // self.factor)
+        x = x.reshape(B, C, D // self.factor, self.factor, H // self.factor, self.factor, W // self.factor, self.factor)
+        x = x.permute(0, 1, 3, 5, 7, 2, 4, 6)
+        x = x.reshape(B, C * self.factor**3, D // self.factor, H // self.factor, W // self.factor)
+        x = x.reshape(B, self.out_channels, self.group_size, D // self.factor, H // self.factor, W // self.factor)
         x = x.mean(dim=2)
         return x
 
@@ -446,7 +446,7 @@ class CausalConvAfterNorm(CausalConv):
         if self.time_causal_padding == (1, 1, 1, 1, 2, 0):
             pass
         else:
-            x = nn.functional.pad(x, self.time_causal_padding).contiguous()
+            x = nn.functional.pad(x, self.time_causal_padding)
 
         x = base_conv3d_channel_last(x, self.conv, residual=residual)
         return x
@@ -477,7 +477,7 @@ class AttnBlock(nn.Module):
         return x
 
     def forward(self, x):
-        x = x.permute(0,2,3,4,1).contiguous()
+        x = x.permute(0,2,3,4,1)
         h = self.attention(x)
         x = self.proj_out(h, residual=x)
         x = x.permute(0,4,1,2,3)
@@ -513,7 +513,7 @@ class Resnet3DBlock(nn.Module):
                 self.nin_shortcut = CausalConvAfterNorm(in_channels, out_channels, kernel_size=1)
 
     def forward(self, x, temb=None, is_init=True):
-        x = x.permute(0,2,3,4,1).contiguous()
+        x = x.permute(0,2,3,4,1)
 
         h = base_group_norm_with_zero_pad(x, self.norm1, act_silu=True, pad_size=2)
         h = self.conv1(h)
@@ -621,7 +621,7 @@ class VideoEncoder(nn.Module):
         h = self.conv_in(x, is_init)
 
         # make it real channel last, but behave like normal layout
-        h = h.permute(0,2,3,4,1).contiguous().permute(0,4,1,2,3)
+        h = h.permute(0,2,3,4,1).permute(0,4,1,2,3)
 
         for i_level in range(self.num_resolutions):
             for i_block in range(self.num_res_blocks):
@@ -642,15 +642,15 @@ class VideoEncoder(nn.Module):
         h = self.mid.attn_1(h)
         h = self.mid.block_2(h, temb, is_init)
 
-        h = h.permute(0,2,3,4,1).contiguous() # b c l h w -> b l h w c
+        h = h.permute(0,2,3,4,1) # b c l h w -> b l h w c
         if self.version == 2:
             h = base_group_norm(h, self.norm_out, act_silu=True, channel_last=True)
-            h = h.permute(0,4,1,2,3).contiguous()
+            h = h.permute(0,4,1,2,3)
             shortcut = self.shortcut_pathify(h, is_init)
             h = self.conv_patchify(h, is_init)
             h = h.add_(shortcut)
             shortcut = self.shortcut_out(h, is_init).permute(0,2,3,4,1)
-            h = self.conv_out(h.permute(0,2,3,4,1).contiguous(), is_init)
+            h = self.conv_out(h.permute(0,2,3,4,1), is_init)
             h = h.add_(shortcut)
         else:
             h = base_group_norm_with_zero_pad(h, self.norm_out, act_silu=True, pad_size=2)
@@ -692,7 +692,7 @@ class Res3DBlockUpsample(nn.Module):
             self.norm3 = nn.GroupNorm(32, num_filters)
 
     def forward(self, x, is_init=False):
-        x = x.permute(0,2,3,4,1).contiguous()
+        x = x.permute(0,2,3,4,1)
 
         residual = x
 
@@ -821,16 +821,16 @@ class VideoDecoder(nn.Module):
 
         temb = None
 
-        h = h.permute(0,2,3,4,1).contiguous().permute(0,4,1,2,3)
+        h = h.permute(0,2,3,4,1).permute(0,4,1,2,3)
         h = self.mid.block_1(h, temb, is_init=is_init)
         h = self.mid.attn_1(h)
-        h = h.permute(0,2,3,4,1).contiguous().permute(0,4,1,2,3)
+        h = h.permute(0,2,3,4,1).permute(0,4,1,2,3)
         h = self.mid.block_2(h, temb, is_init=is_init)
 
         # upsampling
         for i_level in reversed(range(self.num_resolutions)):
             for i_block in range(self.num_res_blocks + 1):
-                h = h.permute(0,2,3,4,1).contiguous().permute(0,4,1,2,3)
+                h = h.permute(0,2,3,4,1).permute(0,4,1,2,3)
                 h = self.up[i_level].block[i_block](h, temb, is_init=is_init)
                 if len(self.up[i_level].attn) > 0:
                     h = self.up[i_level].attn[i_block](h)
@@ -952,7 +952,7 @@ class AutoencoderKL(nn.Module):
 
     def naive_encode(self, x, is_init_image=True):
         b, l, c, h, w = x.size()
-        x = rearrange(x, 'b l c h w -> b c l h w').contiguous()
+        x = rearrange(x, 'b l c h w -> b c l h w')
         z = self.encoder(x, l, True) # 下采样[1, 4, 8, 16, 16]
         return z
 
