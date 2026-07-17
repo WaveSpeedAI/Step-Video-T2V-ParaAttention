@@ -26,7 +26,7 @@ if __name__ == "__main__":
         packages=find_packages(),
         install_requires=[
             "torchvision==0.18",
-            "torch==2.3",
+            "torch==2.13.0",
             "accelerate>=1.0.0",
             "transformers>=4.39.1",
             "diffusers>=0.31.0",
